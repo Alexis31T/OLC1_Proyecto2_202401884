@@ -1,0 +1,80 @@
+import { Instruccion } from "../Abstract/Instruccion";
+import { TablaSimbolos } from "../Simbolo/TablaSimbolos";
+import { Tipo } from "../Simbolo/Tipo";
+import { tipoDato } from "../Simbolo/tipoDato";
+import { Errores } from "../Excepciones/Errores";
+import { OperadoresRelacionales } from "./OperadoresRelacionales";
+import { Node } from "../Abstract/Node"
+import { Arbol } from "../Simbolo/Arbol";
+
+export class Distinto extends Instruccion {
+    private operando1: Instruccion;
+    private operando2: Instruccion;
+    private operador: OperadoresRelacionales;
+
+    constructor(
+        operando1: Instruccion,
+        operando2: Instruccion,
+        operador: OperadoresRelacionales,
+        linea: number,
+        columna: number
+    ) {
+        super(new Tipo(tipoDato.BOOLEANO, true), linea, columna);
+        this.operando1 = operando1;
+        this.operando2 = operando2;
+        this.operador = operador;
+    }
+
+    interpretar(arbol: any, tabla: TablaSimbolos): any {
+        const opIzq = this.operando1.interpretar(arbol, tabla);
+        if (opIzq instanceof Errores) return opIzq;
+
+        const opDer = this.operando2.interpretar(arbol, tabla);
+        if (opDer instanceof Errores) return opDer;
+
+        const tipoIzq = this.operando1.tipo.tipoDato;
+        const tipoDer = this.operando2.tipo.tipoDato;
+
+        const esNumeroIzq = tipoIzq === tipoDato.ENTERO || tipoIzq === tipoDato.DECIMAL;
+        const esNumeroDer = tipoDer === tipoDato.ENTERO || tipoDer === tipoDato.DECIMAL;
+        const esRune = tipoIzq === tipoDato.CARACTER && tipoDer === tipoDato.CARACTER;
+        const esBool = tipoIzq === tipoDato.BOOLEANO && tipoDer === tipoDato.BOOLEANO;
+        const esCadena = tipoIzq === tipoDato.CADENA && tipoDer === tipoDato.CADENA;
+
+        switch (this.operador) {
+            case OperadoresRelacionales.DISTINTO:
+                if (esNumeroIzq && esNumeroDer) {
+                    return Number(opIzq) !== Number(opDer);
+                }
+                if (esRune) {
+                    return opIzq.toString().charCodeAt(0) !== opDer.toString().charCodeAt(0);
+                }
+                if (esBool || esCadena) {
+                    return opIzq !== opDer;
+                }
+
+                return new Errores(
+                    "Semantico",
+                    "No se puede aplicar != entre esos tipos",
+                    this.linea,
+                    this.col
+                );
+
+            default:
+                return new Errores(
+                    "Semantico",
+                    "Operador relacional inválido en Distinto",
+                    this.linea,
+                    this.col
+                );
+        }
+    }
+    
+    public ast(arbol: Arbol, tabla: TablaSimbolos): Node {
+        let node = new Node("DISTINTO");
+        node.pushChild(new Node(this.operando1.interpretar(arbol, tabla).toString()));
+        node.pushChild(new Node("!="));
+        node.pushChild(new Node(this.operando2.interpretar(arbol, tabla).toString()));
+        return node;
+    }
+}
