@@ -6,6 +6,7 @@ import { Errores } from "../Excepciones/Errores";
 import { Node } from "../Abstract/Node";
 import { Funcion } from "../Instrucciones/Funcion";
 import { SliceValue } from "../Simbolo/SliceValue";
+import { StructValue } from "../Simbolo/StructValue";
 
 export const analizar = (req: any, res: any) => {
 
@@ -52,8 +53,13 @@ export const analizar = (req: any, res: any) => {
         const tablaSimbolos = tabla.getAllSymbols().map((simbolo) => ({
             identificador: simbolo.id,
             tipo: simbolo.tipo.tipoDato,
+            tipoStruct: simbolo.tipoStruct ?? null,
             subtipo: simbolo.valor instanceof SliceValue ? simbolo.valor.subtipo : null,
-            valor: simbolo.valor instanceof SliceValue ? simbolo.valor.valores : simbolo.valor,
+            valor: simbolo.valor instanceof SliceValue
+                ? simbolo.valor.valores
+                : simbolo.valor instanceof StructValue
+                    ? Object.fromEntries(simbolo.valor.campos)
+                    : simbolo.valor,
             entorno: simbolo.entorno,
             linea: simbolo.linea,
             columna: simbolo.columna

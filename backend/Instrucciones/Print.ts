@@ -7,6 +7,7 @@ import { tipoDato } from "../Simbolo/tipoDato"
 import { tipoInstruccion } from "../Simbolo/tipoInstruccion"
 import { Node } from "../Abstract/Node"
 import { SliceValue } from "../Simbolo/SliceValue"
+import { StructValue } from "../Simbolo/StructValue"
 
 export class Print extends Instruccion {
 
@@ -29,6 +30,8 @@ export class Print extends Instruccion {
                     salida.push("nil")
                 } else if (valor instanceof SliceValue) {
                     salida.push(`[${valor.valores.map((v) => String(v)).join(" ")}]`)
+                } else if (valor instanceof StructValue) {
+                    salida.push(this.formatearStruct(valor))
                 } else {
                     salida.push(valor.toString())
                 }
@@ -43,12 +46,19 @@ export class Print extends Instruccion {
                 arbol.print("nil")
             } else if (valor instanceof SliceValue) {
                 arbol.print(`[${valor.valores.map((v) => String(v)).join(" ")}]`)
+            } else if (valor instanceof StructValue) {
+                arbol.print(this.formatearStruct(valor))
             } else {
                 arbol.print(valor.toString())
             }
         }
 
         return null
+    }
+
+    private formatearStruct(valor: StructValue): string {
+        const campos = valor.definicion.map((campo) => `${campo.id}: ${valor.getCampo(campo.id)}`)
+        return `${valor.nombre}{${campos.join(", ")}}`
     }
 
     public ast(arbol: Arbol, tabla: TablaSimbolos): Node {

@@ -1,6 +1,7 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { Server as HttpServer } from "http";
 
 // Routes
 import testRouter from "../routes/test.route";
@@ -11,6 +12,7 @@ dotenv.config();
 export class Server {
   public app: Application;
   public port: number;
+  private httpServer?: HttpServer;
 
   // Rutas base
   private testPath = "/api/test";
@@ -35,8 +37,8 @@ export class Server {
     this.app.use(this.parserPath, parserRouter);
   }
 
-  public async listen() {
-    this.app.listen(this.port, async () => {
+  public listen() {
+    this.httpServer = this.app.listen(this.port, () => {
       console.log(`Server running on port ${this.port}`);
     });
   }

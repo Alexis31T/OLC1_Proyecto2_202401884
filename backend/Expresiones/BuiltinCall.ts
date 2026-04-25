@@ -3,6 +3,7 @@ import { Node } from "../Abstract/Node";
 import { Errores } from "../Excepciones/Errores";
 import { Arbol } from "../Simbolo/Arbol";
 import { SliceValue } from "../Simbolo/SliceValue";
+import { StructValue } from "../Simbolo/StructValue";
 import { TablaSimbolos } from "../Simbolo/TablaSimbolos";
 import { Tipo } from "../Simbolo/Tipo";
 import { tipoDato } from "../Simbolo/tipoDato";
@@ -11,7 +12,10 @@ export enum BuiltinName {
     LEN = "len",
     APPEND = "append",
     SLICE_INDEX = "slices.Index",
-    STRINGS_JOIN = "strings.Join"
+    STRINGS_JOIN = "strings.Join",
+    STRCONV_ATOI = "strconv.Atoi",
+    STRCONV_PARSEFLOAT = "strconv.ParseFloat",
+    REFLECT_TYPEOF = "reflect.TypeOf"
 }
 
 export class BuiltinCall extends Instruccion {
@@ -34,6 +38,12 @@ export class BuiltinCall extends Instruccion {
                 return this.sliceIndex(arbol, tabla);
             case BuiltinName.STRINGS_JOIN:
                 return this.stringsJoin(arbol, tabla);
+            case BuiltinName.STRCONV_ATOI:
+                return this.strconvAtoi(arbol, tabla);
+            case BuiltinName.STRCONV_PARSEFLOAT:
+                return this.strconvParseFloat(arbol, tabla);
+            case BuiltinName.REFLECT_TYPEOF:
+                return this.reflectTypeOf(arbol, tabla);
             default:
                 return new Errores("Semantico", "Funcion embebida no soportada", this.linea, this.col);
         }
@@ -105,6 +115,92 @@ export class BuiltinCall extends Instruccion {
         }
         this.tipo.tipoDato = tipoDato.CADENA;
         return slice.valores.join(separador);
+    }
+
+    private strconvAtoi(arbol: Arbol, tabla: TablaSimbolos): any {
+        if (this.args.length !== 1) {
+            return new Errores("Semantico", "strconv.Atoi() espera 1 parametro", this.linea, this.col);
+        }
+        const texto = this.args[0].interpretar(arbol, tabla);
+        if (texto instanceof Errores) return texto;
+        if (this.args[0].tipo.tipoDato !== tipoDato.CADENA) {
+            return new Errores("Semantico", "strconv.Atoi() solo acepta string", this.linea, this.col);
+        }
+
+        const fuente = String(texto).trim();
+        if (!/^[+-]?\d+$/.test(fuente)) {
+            return new Errores("Semantico", `strconv.Atoi() no puede convertir "${texto}" a int`, this.linea, this.col);
+        }
+
+        this.tipo.tipoDato = tipoDato.ENTERO;
+        return parseInt(fuente, 10);
+    }
+
+    private strconvParseFloat(arbol: Arbol, tabla: TablaSimbolos): any {
+        if (this.args.length !== 1) {
+            return new Errores("Semantico", "strconv.ParseFloat() espera 1 parametro", this.linea, this.col);
+        }
+        const texto = this.args[0].interpretar(arbol, tabla);
+        if (texto instanceof Errores) return texto;
+        if (this.args[0].tipo.tipoDato !== tipoDato.CADENA) {
+            return new Errores("Semantico", "strconv.ParseFloat() solo acepta string", this.linea, this.col);
+        }
+
+        const fuente = String(texto).trim();
+        const numero = Number(fuente);
+        if (fuente.length === 0 || Number.isNaN(numero)) {
+            return new Errores("Semantico", `strconv.ParseFloat() no puede convertir "${texto}" a float64`, this.linea, this.col);
+        }
+
+        this.tipo.tipoDato = tipoDato.DECIMAL;
+        return numero;
+    }
+
+    private reflectTypeOf(arbol: Arbol, tabla: TablaSimbolos): any {
+        if (this.args.length !== 1) {
+            return new Errores("Semantico", "reflect.TypeOf() espera 1 parametro", this.linea, this.col);
+        }
+
+        const valor = this.args[0].interpretar(arbol, tabla);
+        if (valor instanceof Errores) return valor;
+
+        const tipoArg = this.args[0].tipo.tipoDato;
+        if (tipoArg === undefined) {
+            return new Errores("Semantico", "reflect.TypeOf() no pudo determinar el tipo", this.linea, this.col);
+        }
+
+        let nombreTipo = tipoDato[tipoArg].toLowerCase();
+        if (tipoArg === tipoDato.SLICE && valor instanceof SliceValue) {
+            nombreTipo = `[]${tipoDato[valor.subtipo].toLowerCase()}`;
+        } else if (tipoArg === tipoDato.STRUCT && valor instanceof StructValue) {
+            nombreTipo = valor.nombre;
+        } else {
+            switch (tipoArg) {
+                case tipoDato.ENTERO:
+                    nombreTipo = "int";
+                    break;
+                case tipoDato.DECIMAL:
+                    nombreTipo = "float64";
+                    break;
+                case tipoDato.CADENA:
+                    nombreTipo = "string";
+                    break;
+                case tipoDato.BOOLEANO:
+                    nombreTipo = "bool";
+                    break;
+                case tipoDato.CARACTER:
+                    nombreTipo = "rune";
+                    break;
+                case tipoDato.NULO:
+                    nombreTipo = "nil";
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        this.tipo.tipoDato = tipoDato.CADENA;
+        return nombreTipo;
     }
 
     public ast(arbol: Arbol, tabla: TablaSimbolos): Node {

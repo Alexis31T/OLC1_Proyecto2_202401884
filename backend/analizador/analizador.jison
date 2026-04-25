@@ -3,8 +3,11 @@
 const Print = require("../Instrucciones/Print").Print;
 const Declaracion = require("../Instrucciones/Declaracion").Declaracion;
 const DeclaracionInferida = require("../Instrucciones/DeclaracionInferida").DeclaracionInferida;
+const DeclaracionStruct = require("../Instrucciones/DeclaracionStruct").DeclaracionStruct;
 const Bloque = require("../Instrucciones/Bloque").Bloque;
 const For = require("../Instrucciones/For").For;
+const ForCondicional = require("../Instrucciones/ForCondicional").ForCondicional;
+const ForRange = require("../Instrucciones/ForRange").ForRange;
 const Asignacion = require("../Instrucciones/Asignacion").Asignacion;
 const Continue = require("../Instrucciones/Continue").Continue;
 const Break = require("../Instrucciones/Break").Break;
@@ -12,6 +15,8 @@ const Return = require("../Instrucciones/Return").Return;
 const If = require("../Instrucciones/If").If;
 const Switch = require("../Instrucciones/Switch").Switch;
 const Case = require("../Instrucciones/Case").Case;
+const StructDefinicion = require("../Instrucciones/StructDefinicion").StructDefinicion;
+const StructSet = require("../Instrucciones/StructSet").StructSet;
 const AsignacionCompuesta = require("../Instrucciones/AsignacionCompuesta").AsignacionCompuesta;
 const OperadorAsignacionCompuesta = require("../Instrucciones/AsignacionCompuesta").OperadorAsignacionCompuesta;
 const ActualizacionUnaria = require("../Instrucciones/ActualizacionUnaria").ActualizacionUnaria;
@@ -21,6 +26,8 @@ const LlamadaFuncion = require("../Expresiones/LlamadaFuncion").LlamadaFuncion;
 const SliceLiteral = require("../Expresiones/SliceLiteral").SliceLiteral;
 const SliceAccess = require("../Expresiones/SliceAccess").SliceAccess;
 const SliceSet = require("../Instrucciones/SliceSet").SliceSet;
+const StructLiteral = require("../Expresiones/StructLiteral").StructLiteral;
+const StructAccess = require("../Expresiones/StructAccess").StructAccess;
 const BuiltinCall = require("../Expresiones/BuiltinCall").BuiltinCall;
 const BuiltinName = require("../Expresiones/BuiltinCall").BuiltinName;
 
@@ -64,6 +71,7 @@ const OperadoresRelacionales = require("../Expresiones/OperadoresRelacionales").
 \/\*[\s\S]*?\*\/             /* comentario multilinea */
 
 "func"                      return 'FUNC';
+"struct"                    return 'STRUCT';
 "main"                      return 'MAIN';
 "fmt.Println"               return 'PRINT';
 "int"                       return 'INT_TYPE';
@@ -73,7 +81,9 @@ const OperadoresRelacionales = require("../Expresiones/OperadoresRelacionales").
 "rune"                      return 'RUNE_TYPE';
 "true"                      return 'TRUE';
 "false"                     return 'FALSE';
+"nil"                       return 'NIL';
 "for"                       return 'FOR';
+"range"                     return 'RANGE';
 "continue"                  return 'CONTINUE';
 "break"                     return 'BREAK';
 "return"                    return 'RETURN';
@@ -86,6 +96,9 @@ const OperadoresRelacionales = require("../Expresiones/OperadoresRelacionales").
 "append"                    return 'APPEND';
 "slices.Index"              return 'SLICES_INDEX';
 "strings.Join"              return 'STRINGS_JOIN';
+"strconv.Atoi"              return 'STRCONV_ATOI';
+"strconv.ParseFloat"        return 'STRCONV_PARSEFLOAT';
+"reflect.TypeOf"            return 'REFLECT_TYPEOF';
 
 "<="                        return 'MENORIGUAL';
 ">="                        return 'MAYORIGUAL';
@@ -102,6 +115,7 @@ const OperadoresRelacionales = require("../Expresiones/OperadoresRelacionales").
 "]"                         return 'RBRACKET';
 ";"                         return 'SEMICOLON';
 ":"                         return 'COLON';
+"."                         return 'DOT';
 ","                         return 'COMA';
 "="                         return 'IGUAL';
 
@@ -150,13 +164,79 @@ const OperadoresRelacionales = require("../Expresiones/OperadoresRelacionales").
 %%
 
 START
-    : FUNCIONES EOF
+    : ELEMENTOS EOF
         {
             return $1;
         }
-    | INSTRUCCIONES EOF
+;
+
+ELEMENTOS
+    : ELEMENTOS ELEMENTO
         {
-            return $1;
+            $1.push($2);
+            $$ = $1;
+        }
+    | ELEMENTO
+        {
+            $$ = [$1];
+        }
+;
+
+ELEMENTO
+    : FUNCION
+        {
+            $$ = $1;
+        }
+    | STRUCT_DEF
+        {
+            $$ = $1;
+        }
+    | INSTRUCCION
+        {
+            $$ = $1;
+        }
+;
+
+STRUCT_DEF
+    : STRUCT ID LBRACE STRUCT_ATRIBUTOS RBRACE
+        {
+            $$ = new StructDefinicion(
+                $2,
+                $4,
+                @1.first_line,
+                @1.first_column
+            );
+        }
+;
+
+STRUCT_ATRIBUTOS
+    : STRUCT_ATRIBUTOS STRUCT_ATRIBUTO
+        {
+            $1.push($2);
+            $$ = $1;
+        }
+    | STRUCT_ATRIBUTO
+        {
+            $$ = [$1];
+        }
+;
+
+STRUCT_ATRIBUTO
+    : TIPO ID TERMINADOR
+        {
+            $$ = {
+                id: $2,
+                tipo: $1,
+                tipoStruct: null
+            };
+        }
+    | ID ID TERMINADOR
+        {
+            $$ = {
+                id: $2,
+                tipo: tipoDato.STRUCT,
+                tipoStruct: $1
+            };
         }
 ;
 
@@ -226,6 +306,17 @@ PARAMETRO_DEF
             $$ = {
                 id: $1,
                 tipo: $2,
+                tipoStruct: null,
+                linea: @1.first_line,
+                columna: @1.first_column
+            };
+        }
+    | ID ID
+        {
+            $$ = {
+                id: $1,
+                tipo: tipoDato.STRUCT,
+                tipoStruct: $2,
                 linea: @1.first_line,
                 columna: @1.first_column
             };
@@ -235,7 +326,17 @@ PARAMETRO_DEF
 TIPO_RETORNO_OPT
     : TIPO
         {
-            $$ = $1;
+            $$ = {
+                tipo: $1,
+                tipoStruct: null
+            };
+        }
+    | ID
+        {
+            $$ = {
+                tipo: tipoDato.STRUCT,
+                tipoStruct: $1
+            };
         }
     |
         {
@@ -276,6 +377,41 @@ INSTRUCCION
                 @1.first_column
             );
         }
+    | ID ID IGUAL LBRACE STRUCT_CAMPOS_OPT RBRACE TERMINADOR
+        {
+            $$ = new DeclaracionStruct(
+                $1,
+                $2,
+                new StructLiteral(
+                    $1,
+                    $5,
+                    @4.first_line,
+                    @4.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | ID ID IGUAL EXPRESION TERMINADOR
+        {
+            $$ = new DeclaracionStruct(
+                $1,
+                $2,
+                $4,
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | ID ID TERMINADOR
+        {
+            $$ = new DeclaracionStruct(
+                $1,
+                $2,
+                null,
+                @1.first_line,
+                @1.first_column
+            );
+        }
     | TIPO ID TERMINADOR
         {
             $$ = new Declaracion(
@@ -310,6 +446,16 @@ INSTRUCCION
                 $1,
                 $3,
                 $6,
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | ID DOT ID IGUAL EXPRESION TERMINADOR
+        {
+            $$ = new StructSet(
+                $1,
+                $3,
+                $5,
                 @1.first_line,
                 @1.first_column
             );
@@ -357,6 +503,38 @@ INSTRUCCION
                     $13,
                     @12.first_line,
                     @12.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | FOR EXPRESION LBRACE INSTRUCCIONES RBRACE
+        {
+            $$ = new ForCondicional(
+                $2,
+                new Bloque(
+                    $4,
+                    @3.first_line,
+                    @3.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | FOR ID COMA ID COLON IGUAL RANGE ID LBRACE INSTRUCCIONES RBRACE
+        {
+            $$ = new ForRange(
+                $2,
+                $4,
+                new Identificador(
+                    $8,
+                    @8.first_line,
+                    @8.first_column
+                ),
+                new Bloque(
+                    $10,
+                    @9.first_line,
+                    @9.first_column
                 ),
                 @1.first_line,
                 @1.first_column
@@ -708,6 +886,15 @@ EXPRESION
                 @1.first_line, 
                 @1.first_column);
         }
+    | NIL
+        {
+            $$ = new Nativo(
+                null,
+                new Tipo(tipoDato.NULO, true),
+                @1.first_line,
+                @1.first_column
+            );
+        }
     
     | LPAREN EXPRESION RPAREN
         {
@@ -731,9 +918,27 @@ EXPRESION
             @1.first_column
         );
     }
+    | ID DOT ID
+    {
+        $$ = new StructAccess(
+            $1,
+            $3,
+            @1.first_line,
+            @1.first_column
+        );
+    }
     | ID LPAREN LISTA_EXPRESIONES_OPT RPAREN
     {
         $$ = new LlamadaFuncion(
+            $1,
+            $3,
+            @1.first_line,
+            @1.first_column
+        );
+    }
+    | ID LBRACE STRUCT_CAMPOS_OPT RBRACE
+    {
+        $$ = new StructLiteral(
             $1,
             $3,
             @1.first_line,
@@ -785,6 +990,66 @@ EXPRESION
             @1.first_column
         );
     }
+    | STRCONV_ATOI LPAREN LISTA_EXPRESIONES_OPT RPAREN
+    {
+        $$ = new BuiltinCall(
+            BuiltinName.STRCONV_ATOI,
+            $3,
+            @1.first_line,
+            @1.first_column
+        );
+    }
+    | STRCONV_PARSEFLOAT LPAREN LISTA_EXPRESIONES_OPT RPAREN
+    {
+        $$ = new BuiltinCall(
+            BuiltinName.STRCONV_PARSEFLOAT,
+            $3,
+            @1.first_line,
+            @1.first_column
+        );
+    }
+    | REFLECT_TYPEOF LPAREN LISTA_EXPRESIONES_OPT RPAREN
+    {
+        $$ = new BuiltinCall(
+            BuiltinName.REFLECT_TYPEOF,
+            $3,
+            @1.first_line,
+            @1.first_column
+        );
+    }
+;
+
+STRUCT_CAMPOS_OPT
+    : STRUCT_CAMPOS
+        {
+            $$ = $1;
+        }
+    |
+        {
+            $$ = [];
+        }
+;
+
+STRUCT_CAMPOS
+    : STRUCT_CAMPOS COMA STRUCT_CAMPO
+        {
+            $1.push($3);
+            $$ = $1;
+        }
+    | STRUCT_CAMPO
+        {
+            $$ = [$1];
+        }
+;
+
+STRUCT_CAMPO
+    : ID COLON EXPRESION
+        {
+            $$ = {
+                id: $1,
+                valor: $3
+            };
+        }
 ;
 
 LISTA_EXPRESIONES_OPT

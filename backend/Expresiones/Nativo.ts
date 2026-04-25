@@ -19,7 +19,7 @@ export class Nativo extends Instruccion {
 
     public ast(): Node{
         let node = new Node("NATIVO");
-        node.pushChild(new Node(this.valor.toString()));
+        node.pushChild(new Node(this.valor === null ? "nil" : this.valor.toString()));
         return node;
     }
 }

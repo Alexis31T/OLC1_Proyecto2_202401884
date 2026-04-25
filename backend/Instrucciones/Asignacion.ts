@@ -7,6 +7,7 @@ import { tipoDato } from "../Simbolo/tipoDato";
 import { Node } from "../Abstract/Node"
 import { Arbol } from "../Simbolo/Arbol";
 import { SliceValue } from "../Simbolo/SliceValue";
+import { StructValue } from "../Simbolo/StructValue";
 
 export class Asignacion extends Instruccion {
     private id: string;
@@ -35,6 +36,20 @@ export class Asignacion extends Instruccion {
 
         const tipoVariable = simbolo.tipo.tipoDato;
         const tipoNuevo = this.valor.tipo.tipoDato;
+        const esNil = tipoNuevo === tipoDato.NULO;
+
+        if (esNil) {
+            if (tipoVariable !== tipoDato.SLICE && tipoVariable !== tipoDato.STRUCT) {
+                return new Errores(
+                    "Semantico",
+                    `No se puede asignar nil a ${this.id} de tipo ${tipoDato[tipoVariable!]}`,
+                    this.linea,
+                    this.col
+                );
+            }
+            simbolo.valor = null;
+            return null;
+        }
 
         const esIntToFloat =
             tipoVariable === tipoDato.DECIMAL && tipoNuevo === tipoDato.ENTERO;
@@ -46,6 +61,17 @@ export class Asignacion extends Instruccion {
                 this.linea,
                 this.col
             );
+        }
+
+        if (tipoVariable === tipoDato.STRUCT) {
+            if (!(nuevoValor instanceof StructValue) || nuevoValor.nombre !== simbolo.tipoStruct) {
+                return new Errores(
+                    "Semantico",
+                    `No se puede asignar un struct distinto a ${this.id}`,
+                    this.linea,
+                    this.col
+                );
+            }
         }
 
         if (tipoVariable === tipoDato.SLICE && simbolo.valor instanceof SliceValue && nuevoValor instanceof SliceValue) {

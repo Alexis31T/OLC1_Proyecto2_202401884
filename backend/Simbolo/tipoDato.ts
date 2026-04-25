@@ -7,5 +7,6 @@ export enum tipoDato {
     CARACTER,
     SLICE,
     NULO,
-    ERROR
+    ERROR,
+    STRUCT
 }

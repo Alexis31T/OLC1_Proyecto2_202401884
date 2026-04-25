@@ -29,8 +29,19 @@ export class Declaracion extends Instruccion {
                 return resultado;
             }
             const tipoValor = this.valor.tipo.tipoDato;
+            const esNil = tipoValor === tipoDato.NULO;
             const esIntToFloat = this.tipoDeclarado === tipoDato.DECIMAL && tipoValor === tipoDato.ENTERO;
-            if (this.tipoDeclarado !== tipoValor && !esIntToFloat) {
+            if (esNil) {
+                if (this.tipoDeclarado !== tipoDato.SLICE && this.tipoDeclarado !== tipoDato.STRUCT) {
+                    return new Errores(
+                        "Semantico",
+                        `No se puede declarar ${this.id} de tipo ${tipoDato[this.tipoDeclarado]} con nil`,
+                        this.linea,
+                        this.col
+                    );
+                }
+            }
+            if (!esNil && this.tipoDeclarado !== tipoValor && !esIntToFloat) {
                 return new Errores(
                     "Semantico",
                     `No se puede declarar ${this.id} de tipo ${tipoDato[this.tipoDeclarado]} con valor ${tipoDato[tipoValor]}`,

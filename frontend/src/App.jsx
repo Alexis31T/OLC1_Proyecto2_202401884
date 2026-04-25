@@ -10,6 +10,7 @@ function App() {
     5: "slice",
     6: "nil",
     7: "error",
+    8: "struct",
   };
   const [codigo, setCodigo] = useState(`func main() {
   int a = 10;
@@ -193,11 +194,19 @@ function App() {
                   <tr key={index}>
                     <td>{simbolo.identificador}</td>
                     <td>
-                      {(simbolo.subtipo !== null && simbolo.subtipo !== undefined)
+                      {simbolo.tipoStruct
+                        ? simbolo.tipoStruct
+                        : (simbolo.subtipo !== null && simbolo.subtipo !== undefined)
                         ? `[]${tipos[simbolo.subtipo] ?? simbolo.subtipo}`
                         : (tipos[simbolo.tipo] ?? simbolo.tipo)}
                     </td>
-                    <td>{Array.isArray(simbolo.valor) ? `[${simbolo.valor.join(" ")}]` : String(simbolo.valor)}</td>
+                    <td>
+                      {Array.isArray(simbolo.valor)
+                        ? `[${simbolo.valor.join(" ")}]`
+                        : simbolo.valor && typeof simbolo.valor === "object"
+                          ? JSON.stringify(simbolo.valor)
+                          : String(simbolo.valor)}
+                    </td>
                     <td>{simbolo.entorno}</td>
                   </tr>
                 ))

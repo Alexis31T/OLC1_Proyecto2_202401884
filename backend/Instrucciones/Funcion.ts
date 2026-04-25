@@ -12,17 +12,23 @@ import { Return } from "./Return";
 type ParametroFuncion = {
     id: string;
     tipo: tipoDato;
+    tipoStruct?: string | null;
     linea: number;
     columna: number;
+};
+
+type TipoFuncion = {
+    tipo: tipoDato;
+    tipoStruct?: string | null;
 };
 
 export class Funcion extends Instruccion {
     public id: string;
     public parametros: ParametroFuncion[];
-    public tipoRetorno: tipoDato | null;
+    public tipoRetorno: TipoFuncion | null;
     public instrucciones: Instruccion[];
 
-    constructor(id: string, parametros: ParametroFuncion[], tipoRetorno: tipoDato | null, instrucciones: Instruccion[], linea: number, columna: number) {
+    constructor(id: string, parametros: ParametroFuncion[], tipoRetorno: TipoFuncion | null, instrucciones: Instruccion[], linea: number, columna: number) {
         super(new Tipo(tipoInstruccion.FUNCION, false), linea, columna);
         this.id = id;
         this.parametros = parametros;
@@ -56,6 +62,12 @@ export class Funcion extends Instruccion {
             if (valorArg instanceof Errores) return valorArg;
 
             const tipoArg = arg.tipo.tipoDato!;
+            const esNil = tipoArg === tipoDato.NULO;
+            if (esNil) {
+                if (def.tipo !== tipoDato.STRUCT) {
+                    return new Errores("Semantico", `Parametro ${def.id} no acepta nil`, def.linea, def.columna);
+                }
+            } else {
             const esIntToFloat = def.tipo === tipoDato.DECIMAL && tipoArg === tipoDato.ENTERO;
             if (def.tipo !== tipoArg && !esIntToFloat) {
                 return new Errores(
@@ -65,14 +77,22 @@ export class Funcion extends Instruccion {
                     def.columna
                 );
             }
+            if (def.tipo === tipoDato.STRUCT) {
+                const structArg = valorArg?.nombre;
+                if (structArg !== def.tipoStruct) {
+                    return new Errores("Semantico", `Parametro ${def.id} esperaba struct ${def.tipoStruct}`, def.linea, def.columna);
+                }
+            }
+            }
 
             const simbolo = new Simbolo(
                 new Tipo(def.tipo, true),
                 def.id,
-                esIntToFloat ? Number(valorArg) : valorArg,
+                def.tipo === tipoDato.DECIMAL && tipoArg === tipoDato.ENTERO ? Number(valorArg) : valorArg,
                 def.linea,
                 def.columna,
-                entornoFuncion.nombreEntorno
+                entornoFuncion.nombreEntorno,
+                def.tipoStruct ?? undefined
             );
             const posibleError = entornoFuncion.setVariable(simbolo);
             if (posibleError instanceof Errores) return posibleError;
@@ -88,7 +108,7 @@ export class Funcion extends Instruccion {
         }
 
         if (this.tipoRetorno !== null) {
-            return new Errores("Semantico", `La funcion ${this.id} debe retornar ${tipoDato[this.tipoRetorno]}`, this.linea, this.col);
+            return new Errores("Semantico", `La funcion ${this.id} debe retornar ${tipoDato[this.tipoRetorno.tipo]}`, this.linea, this.col);
         }
 
         return null;
@@ -103,18 +123,31 @@ export class Funcion extends Instruccion {
         }
 
         if (retorno.valorExpresion === null) {
-            return new Errores("Semantico", `La funcion ${this.id} debe retornar ${tipoDato[this.tipoRetorno]}`, this.linea, this.col);
+            return new Errores("Semantico", `La funcion ${this.id} debe retornar ${tipoDato[this.tipoRetorno.tipo]}`, this.linea, this.col);
         }
 
         const tipoRet = retorno.tipo.tipoDato!;
-        const esIntToFloat = this.tipoRetorno === tipoDato.DECIMAL && tipoRet === tipoDato.ENTERO;
-        if (this.tipoRetorno !== tipoRet && !esIntToFloat) {
+        if (tipoRet === tipoDato.NULO) {
+            if (this.tipoRetorno.tipo !== tipoDato.STRUCT) {
+                return new Errores("Semantico", `La funcion ${this.id} no puede retornar nil`, this.linea, this.col);
+            }
+            return null;
+        }
+
+        const esIntToFloat = this.tipoRetorno.tipo === tipoDato.DECIMAL && tipoRet === tipoDato.ENTERO;
+        if (this.tipoRetorno.tipo !== tipoRet && !esIntToFloat) {
             return new Errores(
                 "Semantico",
-                `La funcion ${this.id} retorna ${tipoDato[tipoRet]} y se esperaba ${tipoDato[this.tipoRetorno]}`,
+                `La funcion ${this.id} retorna ${tipoDato[tipoRet]} y se esperaba ${tipoDato[this.tipoRetorno.tipo]}`,
                 this.linea,
                 this.col
             );
+        }
+        if (this.tipoRetorno.tipo === tipoDato.STRUCT) {
+            const structRetorno = retorno.valorRetorno?.nombre;
+            if (structRetorno !== this.tipoRetorno.tipoStruct) {
+                return new Errores("Semantico", `La funcion ${this.id} debe retornar struct ${this.tipoRetorno.tipoStruct}`, this.linea, this.col);
+            }
         }
 
         return esIntToFloat ? Number(retorno.valorRetorno) : retorno.valorRetorno;
@@ -134,7 +167,7 @@ export class Funcion extends Instruccion {
         node.pushChild(params);
 
         if (this.tipoRetorno !== null) {
-            node.pushChild(new Node(`RETORNO:${tipoDato[this.tipoRetorno]}`));
+            node.pushChild(new Node(`RETORNO:${this.tipoRetorno.tipoStruct ?? tipoDato[this.tipoRetorno.tipo]}`));
         } else {
             node.pushChild(new Node("RETORNO:void"));
         }

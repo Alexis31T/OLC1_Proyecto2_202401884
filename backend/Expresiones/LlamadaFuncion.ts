@@ -33,7 +33,7 @@ export class LlamadaFuncion extends Instruccion {
         const resultado = encontrada.ejecutar(arbol, tabla, this.argumentos);
         if (resultado instanceof Errores) return resultado;
 
-        this.tipo.tipoDato = encontrada.tipoRetorno ?? tipoDato.NULO;
+        this.tipo.tipoDato = encontrada.tipoRetorno?.tipo ?? tipoDato.NULO;
         return resultado;
     }
 
