@@ -68,17 +68,27 @@ export class BuiltinCall extends Instruccion {
         }
         const slice = this.args[0].interpretar(arbol, tabla);
         if (slice instanceof Errores) return slice;
-        if (!(slice instanceof SliceValue)) {
+        const sliceBase = slice instanceof SliceValue ? slice : this.crearSliceVacioTipado(tabla);
+        if (!(sliceBase instanceof SliceValue)) {
             return new Errores("Semantico", "append() primer parametro debe ser slice", this.linea, this.col);
         }
         const valor = this.args[1].interpretar(arbol, tabla);
         if (valor instanceof Errores) return valor;
-        if (this.args[1].tipo.tipoDato !== slice.subtipo) {
-            return new Errores("Semantico", `append() esperaba ${tipoDato[slice.subtipo]}`, this.linea, this.col);
+        if (this.args[1].tipo.tipoDato !== sliceBase.subtipo) {
+            return new Errores("Semantico", `append() esperaba ${tipoDato[sliceBase.subtipo]}`, this.linea, this.col);
         }
-        slice.valores.push(valor);
+        sliceBase.valores.push(valor);
         this.tipo.tipoDato = tipoDato.SLICE;
-        return slice;
+        return sliceBase;
+    }
+
+    private crearSliceVacioTipado(tabla: TablaSimbolos): SliceValue | null {
+        const id = (this.args[0] as any).id;
+        if (typeof id !== "string") return null;
+
+        const simbolo = tabla.getVariable(id);
+        if (simbolo?.tipo.tipoDato !== tipoDato.SLICE || simbolo.subtipo === undefined) return null;
+        return new SliceValue(simbolo.subtipo, []);
     }
 
     private sliceIndex(arbol: Arbol, tabla: TablaSimbolos): any {

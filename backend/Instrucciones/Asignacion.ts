@@ -74,16 +74,17 @@ export class Asignacion extends Instruccion {
             }
         }
 
-        if (tipoVariable === tipoDato.SLICE && simbolo.valor instanceof SliceValue && nuevoValor instanceof SliceValue) {
-            if (simbolo.valor.subtipo !== tipoDato.NULO && simbolo.valor.subtipo !== nuevoValor.subtipo) {
+        if (tipoVariable === tipoDato.SLICE && nuevoValor instanceof SliceValue) {
+            const subtipoEsperado = simbolo.subtipo ?? (simbolo.valor instanceof SliceValue ? simbolo.valor.subtipo : tipoDato.NULO);
+            if (subtipoEsperado !== tipoDato.NULO && subtipoEsperado !== nuevoValor.subtipo) {
                 return new Errores(
                     "Semantico",
-                    `No se puede asignar un []${tipoDato[nuevoValor.subtipo]} a ${this.id} que es []${tipoDato[simbolo.valor.subtipo]}`,
+                    `No se puede asignar un []${tipoDato[nuevoValor.subtipo]} a ${this.id} que es []${tipoDato[subtipoEsperado]}`,
                     this.linea,
                     this.col
                 );
             }
-            if (simbolo.valor.subtipo === tipoDato.NULO) {
+            if (simbolo.valor instanceof SliceValue && simbolo.valor.subtipo === tipoDato.NULO) {
                 simbolo.valor.subtipo = nuevoValor.subtipo;
             }
         }

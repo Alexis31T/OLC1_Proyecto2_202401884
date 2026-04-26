@@ -30,8 +30,14 @@ export class ForRange extends Instruccion {
         const sliceEvaluado = this.expresionSlice.interpretar(arbol, tabla);
         if (sliceEvaluado instanceof Errores) return sliceEvaluado;
 
-        if (!(sliceEvaluado instanceof SliceValue)) {
-            return new Errores("Semantico", "El for range solo acepta una expresion de tipo slice", this.linea, this.col);
+        const iterable = sliceEvaluado instanceof SliceValue
+            ? sliceEvaluado
+            : this.expresionSlice.tipo.tipoDato === tipoDato.CADENA
+                ? new SliceValue(tipoDato.CARACTER, String(sliceEvaluado).split(""))
+                : null;
+
+        if (iterable === null) {
+            return new Errores("Semantico", "El for range solo acepta una expresion de tipo slice o string", this.linea, this.col);
         }
 
         const entornoFor = new TablaSimbolos(tabla, "ForRange");
@@ -44,9 +50,9 @@ export class ForRange extends Instruccion {
             entornoFor.nombreEntorno
         );
         const simboloValor = new Simbolo(
-            new Tipo(sliceEvaluado.subtipo, true),
+            new Tipo(iterable.subtipo, true),
             this.idValor,
-            this.valorPorDefecto(sliceEvaluado.subtipo),
+            this.valorPorDefecto(iterable.subtipo),
             this.linea,
             this.col,
             entornoFor.nombreEntorno
@@ -60,9 +66,9 @@ export class ForRange extends Instruccion {
         if (errValor instanceof Errores) return errValor;
         arbol.simbolos.push(simboloValor);
 
-        for (let i = 0; i < sliceEvaluado.valores.length; i++) {
+        for (let i = 0; i < iterable.valores.length; i++) {
             simboloIndice.valor = i;
-            simboloValor.valor = sliceEvaluado.valores[i];
+            simboloValor.valor = iterable.valores[i];
 
             const resultadoCuerpo = this.cuerpo.interpretar(arbol, entornoFor);
             if (resultadoCuerpo instanceof Errores) return resultadoCuerpo;

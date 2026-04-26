@@ -13,6 +13,7 @@ type ParametroFuncion = {
     id: string;
     tipo: tipoDato;
     tipoStruct?: string | null;
+    subtipo?: tipoDato | null;
     linea: number;
     columna: number;
 };
@@ -20,6 +21,7 @@ type ParametroFuncion = {
 type TipoFuncion = {
     tipo: tipoDato;
     tipoStruct?: string | null;
+    subtipo?: tipoDato | null;
 };
 
 export class Funcion extends Instruccion {
@@ -83,6 +85,11 @@ export class Funcion extends Instruccion {
                     return new Errores("Semantico", `Parametro ${def.id} esperaba struct ${def.tipoStruct}`, def.linea, def.columna);
                 }
             }
+            if (def.tipo === tipoDato.SLICE && def.subtipo !== undefined && def.subtipo !== null) {
+                if (valorArg?.subtipo !== def.subtipo && valorArg !== null) {
+                    return new Errores("Semantico", `Parametro ${def.id} esperaba []${tipoDato[def.subtipo]}`, def.linea, def.columna);
+                }
+            }
             }
 
             const simbolo = new Simbolo(
@@ -92,7 +99,8 @@ export class Funcion extends Instruccion {
                 def.linea,
                 def.columna,
                 entornoFuncion.nombreEntorno,
-                def.tipoStruct ?? undefined
+                def.tipoStruct ?? undefined,
+                def.subtipo ?? undefined
             );
             const posibleError = entornoFuncion.setVariable(simbolo);
             if (posibleError instanceof Errores) return posibleError;
@@ -149,6 +157,11 @@ export class Funcion extends Instruccion {
                 return new Errores("Semantico", `La funcion ${this.id} debe retornar struct ${this.tipoRetorno.tipoStruct}`, this.linea, this.col);
             }
         }
+        if (this.tipoRetorno.tipo === tipoDato.SLICE && this.tipoRetorno.subtipo !== undefined && this.tipoRetorno.subtipo !== null) {
+            if (retorno.valorRetorno?.subtipo !== this.tipoRetorno.subtipo && retorno.valorRetorno !== null) {
+                return new Errores("Semantico", `La funcion ${this.id} debe retornar []${tipoDato[this.tipoRetorno.subtipo]}`, this.linea, this.col);
+            }
+        }
 
         return esIntToFloat ? Number(retorno.valorRetorno) : retorno.valorRetorno;
     }
@@ -161,7 +174,7 @@ export class Funcion extends Instruccion {
         for (const p of this.parametros) {
             const pNode = new Node("PARAMETRO");
             pNode.pushChild(new Node(p.id));
-            pNode.pushChild(new Node(tipoDato[p.tipo]));
+            pNode.pushChild(new Node(p.subtipo !== undefined && p.subtipo !== null ? `[]${tipoDato[p.subtipo]}` : tipoDato[p.tipo]));
             params.pushChild(pNode);
         }
         node.pushChild(params);

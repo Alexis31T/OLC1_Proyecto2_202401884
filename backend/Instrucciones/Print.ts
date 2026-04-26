@@ -28,12 +28,8 @@ export class Print extends Instruccion {
                 }
                 if (valor === null || valor === undefined) {
                     salida.push("nil")
-                } else if (valor instanceof SliceValue) {
-                    salida.push(`[${valor.valores.map((v) => String(v)).join(" ")}]`)
-                } else if (valor instanceof StructValue) {
-                    salida.push(this.formatearStruct(valor))
                 } else {
-                    salida.push(valor.toString())
+                    salida.push(this.formatearValor(valor))
                 }
             }
             arbol.print(salida.join(" "))
@@ -44,20 +40,25 @@ export class Print extends Instruccion {
             }
             if (valor === null || valor === undefined) {
                 arbol.print("nil")
-            } else if (valor instanceof SliceValue) {
-                arbol.print(`[${valor.valores.map((v) => String(v)).join(" ")}]`)
-            } else if (valor instanceof StructValue) {
-                arbol.print(this.formatearStruct(valor))
             } else {
-                arbol.print(valor.toString())
+                arbol.print(this.formatearValor(valor))
             }
         }
 
         return null
     }
 
+    private formatearValor(valor: any): string {
+        if (valor === null || valor === undefined) return "nil"
+        if (valor instanceof SliceValue) {
+            return `[${valor.valores.map((item) => this.formatearValor(item)).join(" ")}]`
+        }
+        if (valor instanceof StructValue) return this.formatearStruct(valor)
+        return valor.toString()
+    }
+
     private formatearStruct(valor: StructValue): string {
-        const campos = valor.definicion.map((campo) => `${campo.id}: ${valor.getCampo(campo.id)}`)
+        const campos = valor.definicion.map((campo) => `${campo.id}: ${this.formatearValor(valor.getCampo(campo.id))}`)
         return `${valor.nombre}{${campos.join(", ")}}`
     }
 

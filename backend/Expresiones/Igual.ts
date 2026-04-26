@@ -40,11 +40,23 @@ export class Igual extends Instruccion {
         const esRune = tipoIzq === tipoDato.CARACTER && tipoDer === tipoDato.CARACTER;
         const esBool = tipoIzq === tipoDato.BOOLEANO && tipoDer === tipoDato.BOOLEANO;
         const esCadena = tipoIzq === tipoDato.CADENA && tipoDer === tipoDato.CADENA;
+        const esNil = tipoIzq === tipoDato.NULO || tipoDer === tipoDato.NULO;
+        const esRuneNumero =
+            (tipoIzq === tipoDato.CARACTER && esNumeroDer) ||
+            (tipoDer === tipoDato.CARACTER && esNumeroIzq);
 
         switch (this.operador) {
             case OperadoresRelacionales.IGUAL:
                 if (esNumeroIzq && esNumeroDer) {
                     return Number(opIzq) === Number(opDer);
+                }
+                if (esNil) {
+                    return opIzq === null && opDer === null;
+                }
+                if (esRuneNumero) {
+                    const izq = tipoIzq === tipoDato.CARACTER ? opIzq.toString().charCodeAt(0) : Number(opIzq);
+                    const der = tipoDer === tipoDato.CARACTER ? opDer.toString().charCodeAt(0) : Number(opDer);
+                    return izq === der;
                 }
                 if (esRune) {
                     return opIzq.toString().charCodeAt(0) === opDer.toString().charCodeAt(0);
@@ -72,9 +84,9 @@ export class Igual extends Instruccion {
 
     public ast(arbol: Arbol, tabla: TablaSimbolos): Node {
         let node = new Node("IGUAL");
-        node.pushChild(new Node(this.operando1.interpretar(arbol, tabla).toString()));
+        node.pushChild(this.operando1.ast(arbol, tabla));
         node.pushChild(new Node("=="));
-        node.pushChild(new Node(this.operando2.interpretar(arbol, tabla).toString()));
+        node.pushChild(this.operando2.ast(arbol, tabla));
         return node;
     }
 }

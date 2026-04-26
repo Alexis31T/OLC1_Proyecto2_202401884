@@ -38,6 +38,7 @@ export class MenorQue extends Instruccion {
         const esNumeroIzq = tipoIzq === tipoDato.ENTERO || tipoIzq === tipoDato.DECIMAL;
         const esNumeroDer = tipoDer === tipoDato.ENTERO || tipoDer === tipoDato.DECIMAL;
         const esRune = tipoIzq === tipoDato.CARACTER && tipoDer === tipoDato.CARACTER;
+        const esCadena = tipoIzq === tipoDato.CADENA && tipoDer === tipoDato.CADENA;
 
         switch (this.operador) {
             case OperadoresRelacionales.MENORQUE:
@@ -46,6 +47,9 @@ export class MenorQue extends Instruccion {
                 }
                 if (esRune) {
                     return opIzq.toString().charCodeAt(0) < opDer.toString().charCodeAt(0);
+                }
+                if (esCadena) {
+                    return opIzq < opDer;
                 }
 
                 return new Errores(
@@ -67,9 +71,9 @@ export class MenorQue extends Instruccion {
 
     public ast(arbol: Arbol, tabla: TablaSimbolos): Node {
         let node = new Node("MENOR_QUE");
-        node.pushChild(new Node(this.operando1.interpretar(arbol, tabla).toString()));
+        node.pushChild(this.operando1.ast(arbol, tabla));
         node.pushChild(new Node("<"));
-        node.pushChild(new Node(this.operando2.interpretar(arbol, tabla).toString()));
+        node.pushChild(this.operando2.ast(arbol, tabla));
         return node;
     }
 }

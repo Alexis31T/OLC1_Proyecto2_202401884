@@ -15,12 +15,20 @@ export class Node {
     }
 
     private getNodes(tag:string): string {
-        let dot: string = `\n\tnode_${tag}[label="${this.tag}"];`;
+        let dot: string = `\n\tnode_${tag}[label="${this.escapeLabel(this.tag)}"];`;
         for (let i = 0; i < this.children.length; i++) {
             dot += this.children[i].getNodes(tag + i);
             dot += `\n\tnode_${tag} -> node_${tag + i};`;    
         }
         return dot;
+    }
+
+    private escapeLabel(label: string): string {
+        return label
+            .replace(/\\/g, "\\\\")
+            .replace(/"/g, "\\\"")
+            .replace(/\r/g, "\\r")
+            .replace(/\n/g, "\\n");
     }
 
     public pushChild(child: Node){

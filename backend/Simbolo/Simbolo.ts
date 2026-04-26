@@ -9,6 +9,7 @@ export class Simbolo {
     public columna: number
     public entorno: string
     public tipoStruct?: string
+    public subtipo?: number
     
     constructor(
         tipo: Tipo,
@@ -17,7 +18,8 @@ export class Simbolo {
         linea: number,
         columna: number,
         entorno: string,
-        tipoStruct?: string
+        tipoStruct?: string,
+        subtipo?: number
     ) {
         this.tipo = tipo
         this.id = id
@@ -26,6 +28,7 @@ export class Simbolo {
         this.columna = columna
         this.entorno = entorno
         this.tipoStruct = tipoStruct
+        this.subtipo = subtipo
     }
 
 }

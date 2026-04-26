@@ -8,36 +8,49 @@ import { Tipo } from "../Simbolo/Tipo";
 import { tipoDato } from "../Simbolo/tipoDato";
 
 export class StructAccess extends Instruccion {
-    private id: string;
+    private objetivo: string | Instruccion;
     private campo: string;
 
-    constructor(id: string, campo: string, linea: number, columna: number) {
+    constructor(objetivo: string | Instruccion, campo: string, linea: number, columna: number) {
         super(new Tipo(tipoDato.NULO, true), linea, columna);
-        this.id = id;
+        this.objetivo = objetivo;
         this.campo = campo;
     }
 
-    interpretar(_arbol: Arbol, tabla: TablaSimbolos): any {
-        const simbolo = tabla.getVariable(this.id);
-        if (!simbolo) {
-            return new Errores("Semantico", `La variable ${this.id} no existe`, this.linea, this.col);
-        }
-        if (!(simbolo.valor instanceof StructValue)) {
-            return new Errores("Semantico", `${this.id} no es una instancia de struct`, this.linea, this.col);
+    interpretar(arbol: Arbol, tabla: TablaSimbolos): any {
+        const valorObjetivo = typeof this.objetivo === "string"
+            ? this.obtenerVariable(tabla)
+            : this.objetivo.interpretar(arbol, tabla);
+        if (valorObjetivo instanceof Errores) return valorObjetivo;
+
+        if (!(valorObjetivo instanceof StructValue)) {
+            if (this.campo === "string") {
+                this.tipo.tipoDato = tipoDato.CADENA;
+                return String(valorObjetivo);
+            }
+            return new Errores("Semantico", `El acceso .${this.campo} requiere un struct`, this.linea, this.col);
         }
 
-        const campoDef = simbolo.valor.definicion.find((campo) => campo.id === this.campo);
+        const campoDef = valorObjetivo.definicion.find((campo) => campo.id === this.campo);
         if (!campoDef) {
-            return new Errores("Semantico", `El struct ${simbolo.valor.nombre} no tiene campo ${this.campo}`, this.linea, this.col);
+            return new Errores("Semantico", `El struct ${valorObjetivo.nombre} no tiene campo ${this.campo}`, this.linea, this.col);
         }
 
         this.tipo.tipoDato = campoDef.tipo;
-        return simbolo.valor.getCampo(this.campo);
+        return valorObjetivo.getCampo(this.campo);
+    }
+
+    private obtenerVariable(tabla: TablaSimbolos): any {
+        const simbolo = tabla.getVariable(this.objetivo as string);
+        if (!simbolo) {
+            return new Errores("Semantico", `La variable ${this.objetivo} no existe`, this.linea, this.col);
+        }
+        return simbolo.valor;
     }
 
     public ast(_arbol: Arbol, _tabla: TablaSimbolos): Node {
         const node = new Node("STRUCT_ACCESS");
-        node.pushChild(new Node(this.id));
+        node.pushChild(typeof this.objetivo === "string" ? new Node(this.objetivo) : this.objetivo.ast(_arbol, _tabla));
         node.pushChild(new Node(this.campo));
         return node;
     }

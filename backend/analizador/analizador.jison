@@ -4,6 +4,7 @@ const Print = require("../Instrucciones/Print").Print;
 const Declaracion = require("../Instrucciones/Declaracion").Declaracion;
 const DeclaracionInferida = require("../Instrucciones/DeclaracionInferida").DeclaracionInferida;
 const DeclaracionStruct = require("../Instrucciones/DeclaracionStruct").DeclaracionStruct;
+const DeclaracionSlice = require("../Instrucciones/DeclaracionSlice").DeclaracionSlice;
 const Bloque = require("../Instrucciones/Bloque").Bloque;
 const For = require("../Instrucciones/For").For;
 const ForCondicional = require("../Instrucciones/ForCondicional").ForCondicional;
@@ -24,12 +25,16 @@ const OperadorUnario = require("../Instrucciones/ActualizacionUnaria").OperadorU
 const Funcion = require("../Instrucciones/Funcion").Funcion;
 const LlamadaFuncion = require("../Expresiones/LlamadaFuncion").LlamadaFuncion;
 const SliceLiteral = require("../Expresiones/SliceLiteral").SliceLiteral;
+const MatrixLiteral = require("../Expresiones/MatrixLiteral").MatrixLiteral;
 const SliceAccess = require("../Expresiones/SliceAccess").SliceAccess;
+const SliceAccessExpr = require("../Expresiones/SliceAccessExpr").SliceAccessExpr;
 const SliceSet = require("../Instrucciones/SliceSet").SliceSet;
+const MatrixSet = require("../Instrucciones/MatrixSet").MatrixSet;
 const StructLiteral = require("../Expresiones/StructLiteral").StructLiteral;
 const StructAccess = require("../Expresiones/StructAccess").StructAccess;
 const BuiltinCall = require("../Expresiones/BuiltinCall").BuiltinCall;
 const BuiltinName = require("../Expresiones/BuiltinCall").BuiltinName;
+const Cast = require("../Expresiones/Cast").Cast;
 
 
 
@@ -71,7 +76,9 @@ const OperadoresRelacionales = require("../Expresiones/OperadoresRelacionales").
 \/\*[\s\S]*?\*\/             /* comentario multilinea */
 
 "func"                      return 'FUNC';
+"type"                      return 'TYPE';
 "struct"                    return 'STRUCT';
+"var"                       return 'VAR';
 "main"                      return 'MAIN';
 "fmt.Println"               return 'PRINT';
 "int"                       return 'INT_TYPE';
@@ -207,6 +214,15 @@ STRUCT_DEF
                 @1.first_column
             );
         }
+    | TYPE ID STRUCT LBRACE STRUCT_ATRIBUTOS RBRACE
+        {
+            $$ = new StructDefinicion(
+                $2,
+                $5,
+                @1.first_line,
+                @1.first_column
+            );
+        }
 ;
 
 STRUCT_ATRIBUTOS
@@ -230,12 +246,21 @@ STRUCT_ATRIBUTO
                 tipoStruct: null
             };
         }
-    | ID ID TERMINADOR
+    | ID TIPO TERMINADOR
         {
             $$ = {
-                id: $2,
+                id: $1,
+                tipo: $2,
+                tipoStruct: null
+            };
+        }
+    | ID ID TERMINADOR
+        {
+            const goStyle = /^[a-z_]/.test($1);
+            $$ = {
+                id: goStyle ? $1 : $2,
                 tipo: tipoDato.STRUCT,
-                tipoStruct: $1
+                tipoStruct: goStyle ? $2 : $1
             };
         }
 ;
@@ -311,6 +336,17 @@ PARAMETRO_DEF
                 columna: @1.first_column
             };
         }
+    | ID LBRACKET RBRACKET TIPO
+        {
+            $$ = {
+                id: $1,
+                tipo: tipoDato.SLICE,
+                tipoStruct: null,
+                subtipo: $4,
+                linea: @1.first_line,
+                columna: @1.first_column
+            };
+        }
     | ID ID
         {
             $$ = {
@@ -329,6 +365,14 @@ TIPO_RETORNO_OPT
             $$ = {
                 tipo: $1,
                 tipoStruct: null
+            };
+        }
+    | LBRACKET RBRACKET TIPO
+        {
+            $$ = {
+                tipo: tipoDato.SLICE,
+                tipoStruct: null,
+                subtipo: $3
             };
         }
     | ID
@@ -356,13 +400,57 @@ INSTRUCCIONES
             $$ = [];
             $$.push($1);
         }
+    |
+        {
+            $$ = [];
+        }
 ;
 
 INSTRUCCION
-    : PRINT LPAREN LISTA_EXPRESIONES RPAREN TERMINADOR
+    : PRINT LPAREN LISTA_EXPRESIONES_OPT RPAREN TERMINADOR
         {
             $$ = new Print(
                 $3,
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | VAR ID TIPO IGUAL EXPRESION TERMINADOR
+        {
+            $$ = new Declaracion(
+                $3,
+                $2,
+                $5,
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | VAR ID TIPO TERMINADOR
+        {
+            $$ = new Declaracion(
+                $3,
+                $2,
+                null,
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | VAR ID LBRACKET RBRACKET TIPO IGUAL EXPRESION TERMINADOR
+        {
+            $$ = new DeclaracionSlice(
+                $2,
+                $5,
+                $7,
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | VAR ID LBRACKET RBRACKET TIPO TERMINADOR
+        {
+            $$ = new DeclaracionSlice(
+                $2,
+                $5,
+                null,
                 @1.first_line,
                 @1.first_column
             );
@@ -385,6 +473,21 @@ INSTRUCCION
                 new StructLiteral(
                     $1,
                     $5,
+                    @4.first_line,
+                    @4.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | ID ID IGUAL ID LBRACE STRUCT_CAMPOS_OPT RBRACE TERMINADOR
+        {
+            $$ = new DeclaracionStruct(
+                $1,
+                $2,
+                new StructLiteral(
+                    $4,
+                    $6,
                     @4.first_line,
                     @4.first_column
                 ),
@@ -431,6 +534,20 @@ INSTRUCCION
                 @1.first_column
             );
         }
+    | ID COLON IGUAL ID LBRACE STRUCT_CAMPOS_OPT RBRACE TERMINADOR
+        {
+            $$ = new DeclaracionInferida(
+                $1,
+                new StructLiteral(
+                    $4,
+                    $6,
+                    @4.first_line,
+                    @4.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
     | ID IGUAL EXPRESION TERMINADOR
         {
             $$ = new Asignacion(
@@ -450,6 +567,17 @@ INSTRUCCION
                 @1.first_column
             );
         }
+    | ID LBRACKET EXPRESION RBRACKET LBRACKET EXPRESION RBRACKET IGUAL EXPRESION TERMINADOR
+        {
+            $$ = new MatrixSet(
+                $1,
+                $3,
+                $6,
+                $9,
+                @1.first_line,
+                @1.first_column
+            );
+        }
     | ID DOT ID IGUAL EXPRESION TERMINADOR
         {
             $$ = new StructSet(
@@ -458,6 +586,16 @@ INSTRUCCION
                 $5,
                 @1.first_line,
                 @1.first_column
+            );
+        }
+    | EXPRESION DOT ID IGUAL EXPRESION TERMINADOR
+        {
+            $$ = new StructSet(
+                $1,
+                $3,
+                $5,
+                @2.first_line,
+                @2.first_column
             );
         }
     | CONTINUE TERMINADOR
@@ -508,6 +646,81 @@ INSTRUCCION
                 @1.first_column
             );
         }
+    | FOR ID COLON IGUAL EXPRESION SEMICOLON EXPRESION SEMICOLON ID IGUAL EXPRESION LBRACE INSTRUCCIONES RBRACE
+        {
+            $$ = new For(
+                new DeclaracionInferida(
+                    $2,
+                    $5,
+                    @2.first_line,
+                    @2.first_column
+                ),
+                $7,
+                new Asignacion(
+                    $9,
+                    $11,
+                    @9.first_line,
+                    @9.first_column
+                ),
+                new Bloque(
+                    $13,
+                    @12.first_line,
+                    @12.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | FOR ID COLON IGUAL EXPRESION SEMICOLON EXPRESION SEMICOLON ID INCREMENTO LBRACE INSTRUCCIONES RBRACE
+        {
+            $$ = new For(
+                new DeclaracionInferida(
+                    $2,
+                    $5,
+                    @2.first_line,
+                    @2.first_column
+                ),
+                $7,
+                new ActualizacionUnaria(
+                    $9,
+                    OperadorUnario.INCREMENTO,
+                    @9.first_line,
+                    @9.first_column
+                ),
+                new Bloque(
+                    $12,
+                    @11.first_line,
+                    @11.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | FOR ID COLON IGUAL EXPRESION SEMICOLON EXPRESION SEMICOLON ID DECREMENTO LBRACE INSTRUCCIONES RBRACE
+        {
+            $$ = new For(
+                new DeclaracionInferida(
+                    $2,
+                    $5,
+                    @2.first_line,
+                    @2.first_column
+                ),
+                $7,
+                new ActualizacionUnaria(
+                    $9,
+                    OperadorUnario.DECREMENTO,
+                    @9.first_line,
+                    @9.first_column
+                ),
+                new Bloque(
+                    $12,
+                    @11.first_line,
+                    @11.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
     | FOR EXPRESION LBRACE INSTRUCCIONES RBRACE
         {
             $$ = new ForCondicional(
@@ -548,6 +761,20 @@ INSTRUCCION
                 @1.first_column
             );
         }
+    | SWITCH ID LBRACE CASE_LISTA DEFAULT_BLOQUE_OPT RBRACE
+        {
+            $$ = new Switch(
+                new Identificador(
+                    $2,
+                    @2.first_line,
+                    @2.first_column
+                ),
+                $4,
+                $5,
+                @1.first_line,
+                @1.first_column
+            );
+        }
     | SWITCH EXPRESION LBRACE CASE_LISTA DEFAULT_BLOQUE_OPT RBRACE
         {
             $$ = new Switch(
@@ -571,6 +798,70 @@ INSTRUCCION
                     $8,
                     @7.first_line,
                     @7.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | IF EXPRESION LBRACE INSTRUCCIONES RBRACE ELSE IF EXPRESION LBRACE INSTRUCCIONES RBRACE
+        {
+            $$ = new If(
+                $2,
+                new Bloque(
+                    $4,
+                    @3.first_line,
+                    @3.first_column
+                ),
+                new Bloque(
+                    [
+                        new If(
+                            $8,
+                            new Bloque(
+                                $10,
+                                @9.first_line,
+                                @9.first_column
+                            ),
+                            null,
+                            @7.first_line,
+                            @7.first_column
+                        )
+                    ],
+                    @6.first_line,
+                    @6.first_column
+                ),
+                @1.first_line,
+                @1.first_column
+            );
+        }
+    | IF EXPRESION LBRACE INSTRUCCIONES RBRACE ELSE IF EXPRESION LBRACE INSTRUCCIONES RBRACE ELSE LBRACE INSTRUCCIONES RBRACE
+        {
+            $$ = new If(
+                $2,
+                new Bloque(
+                    $4,
+                    @3.first_line,
+                    @3.first_column
+                ),
+                new Bloque(
+                    [
+                        new If(
+                            $8,
+                            new Bloque(
+                                $10,
+                                @9.first_line,
+                                @9.first_column
+                            ),
+                            new Bloque(
+                                $14,
+                                @13.first_line,
+                                @13.first_column
+                            ),
+                            @7.first_line,
+                            @7.first_column
+                        )
+                    ],
+                    @6.first_line,
+                    @6.first_column
                 ),
                 @1.first_line,
                 @1.first_column
@@ -918,9 +1209,54 @@ EXPRESION
             @1.first_column
         );
     }
+    | EXPRESION LBRACKET EXPRESION RBRACKET
+    {
+        $$ = new SliceAccessExpr(
+            $1,
+            $3,
+            @2.first_line,
+            @2.first_column
+        );
+    }
     | ID DOT ID
     {
         $$ = new StructAccess(
+            $1,
+            $3,
+            @1.first_line,
+            @1.first_column
+        );
+    }
+    | ID DOT STRING_TYPE
+    {
+        $$ = new StructAccess(
+            $1,
+            "string",
+            @1.first_line,
+            @1.first_column
+        );
+    }
+    | EXPRESION DOT ID
+    {
+        $$ = new StructAccess(
+            $1,
+            $3,
+            @2.first_line,
+            @2.first_column
+        );
+    }
+    | EXPRESION DOT STRING_TYPE
+    {
+        $$ = new StructAccess(
+            $1,
+            "string",
+            @2.first_line,
+            @2.first_column
+        );
+    }
+    | TIPO LPAREN EXPRESION RPAREN
+    {
+        $$ = new Cast(
             $1,
             $3,
             @1.first_line,
@@ -936,20 +1272,20 @@ EXPRESION
             @1.first_column
         );
     }
-    | ID LBRACE STRUCT_CAMPOS_OPT RBRACE
-    {
-        $$ = new StructLiteral(
-            $1,
-            $3,
-            @1.first_line,
-            @1.first_column
-        );
-    }
     | LBRACKET RBRACKET TIPO LBRACE LISTA_EXPRESIONES_OPT RBRACE
     {
         $$ = new SliceLiteral(
             $3,
             $5,
+            @1.first_line,
+            @1.first_column
+        );
+    }
+    | LBRACKET RBRACKET LBRACKET RBRACKET TIPO LBRACE MATRIZ_FILAS RBRACE
+    {
+        $$ = new MatrixLiteral(
+            $5,
+            $7,
             @1.first_line,
             @1.first_column
         );
@@ -1019,6 +1355,29 @@ EXPRESION
     }
 ;
 
+MATRIZ_FILAS
+    : MATRIZ_FILAS COMA MATRIZ_FILA
+        {
+            $1.push($3);
+            $$ = $1;
+        }
+    | MATRIZ_FILAS COMA
+        {
+            $$ = $1;
+        }
+    | MATRIZ_FILA
+        {
+            $$ = [$1];
+        }
+;
+
+MATRIZ_FILA
+    : LBRACE LISTA_EXPRESIONES_OPT RBRACE
+        {
+            $$ = $2;
+        }
+;
+
 STRUCT_CAMPOS_OPT
     : STRUCT_CAMPOS
         {
@@ -1034,6 +1393,10 @@ STRUCT_CAMPOS
     : STRUCT_CAMPOS COMA STRUCT_CAMPO
         {
             $1.push($3);
+            $$ = $1;
+        }
+    | STRUCT_CAMPOS COMA
+        {
             $$ = $1;
         }
     | STRUCT_CAMPO

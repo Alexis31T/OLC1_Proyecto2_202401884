@@ -30,7 +30,7 @@ export class NegacionUnaria extends Instruccion {
     public ast(arbol: Arbol, tabla: TablaSimbolos): Node {
         const node = new Node("NEGACION_UNARIA");
         node.pushChild(new Node("-"));
-        node.pushChild(new Node(this.operando.interpretar(arbol, tabla).toString()));
+        node.pushChild(this.operando.ast(arbol, tabla));
         return node;
     }
 }

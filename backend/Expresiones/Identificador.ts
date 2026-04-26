@@ -33,10 +33,10 @@ export class Identificador extends Instruccion {
 
     public ast(arbol: any, tabla: TablaSimbolos): Node {
         let node = new Node("IDENTIFICADOR");
-        let simbolo = tabla.getVariable(this.id);
+        let simbolo = tabla?.getVariable(this.id);
         if (simbolo) {
             node.pushChild(new Node(this.id));
-            node.pushChild(new Node(simbolo.valor.toString()));
+            node.pushChild(new Node(simbolo.valor === null || simbolo.valor === undefined ? "nil" : simbolo.valor.toString()));
         } else {
             node.pushChild(new Node(this.id));
             node.pushChild(new Node("null"));

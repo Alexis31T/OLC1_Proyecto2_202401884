@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function App() {
   const tipos = {
@@ -22,12 +22,62 @@ function App() {
   const [errores, setErrores] = useState([]);
   const [tablaSimbolos, setTablaSimbolos] = useState([]);
   const [astDot, setAstDot] = useState("");
+  const [astImageUrl, setAstImageUrl] = useState("");
+  const [astRenderError, setAstRenderError] = useState("");
+  const [astCargando, setAstCargando] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [lineaActual, setLineaActual] = useState(1);
   const [nombreArchivo, setNombreArchivo] = useState("nuevo.gst");
-  const astGraphvizUrl = astDot
-    ? `https://quickchart.io/graphviz?graph=${encodeURIComponent(astDot)}`
-    : "";
+
+  useEffect(() => {
+    if (!astDot) {
+      setAstImageUrl("");
+      setAstRenderError("");
+      setAstCargando(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    let objectUrl = "";
+
+    const renderAst = async () => {
+      setAstCargando(true);
+      setAstRenderError("");
+      setAstImageUrl("");
+
+      try {
+        const response = await fetch("https://quickchart.io/graphviz", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ graph: astDot }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`No se pudo renderizar el AST (${response.status})`);
+        }
+
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+        setAstImageUrl(objectUrl);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setAstRenderError(error.message || "No se pudo renderizar el AST");
+        }
+      } finally {
+        setAstCargando(false);
+      }
+    };
+
+    renderAst();
+
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [astDot]);
 
   const getLineaActual = (elemento) => {
     const texto = elemento.value.substring(0, elemento.selectionStart);
@@ -53,11 +103,16 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        const detalle =
-          data?.errores?.[0]?.descripcion ||
-          data?.error ||
-          "No se pudo ejecutar el análisis";
-        throw new Error(detalle);
+        setSalida(data?.consola ?? "");
+        setErrores(Array.isArray(data?.errores) ? data.errores : [
+          {
+            tipo: "Error",
+            descripcion: data?.error || "No se pudo ejecutar el análisis",
+          },
+        ]);
+        setTablaSimbolos(Array.isArray(data?.tablaSimbolos) ? data.tablaSimbolos : []);
+        setAstDot(data?.astDot ?? "");
+        return;
       }
 
       setSalida(data?.consola ?? "");
@@ -108,6 +163,15 @@ function App() {
     enlace.download = nombre;
     enlace.click();
     URL.revokeObjectURL(url);
+  };
+
+  const formatearValor = (valor) => {
+    if (valor === null || valor === undefined) return "nil";
+    if (Array.isArray(valor)) return `[${valor.map((item) => formatearValor(item)).join(" ")}]`;
+    if (typeof valor === "object") {
+      return JSON.stringify(valor, (_clave, item) => item === null ? "nil" : item);
+    }
+    return String(valor);
   };
 
   return (
@@ -194,18 +258,16 @@ function App() {
                   <tr key={index}>
                     <td>{simbolo.identificador}</td>
                     <td>
-                      {simbolo.tipoStruct
+                      {simbolo.tipoDisplay
+                        ? simbolo.tipoDisplay
+                        : simbolo.tipoStruct
                         ? simbolo.tipoStruct
                         : (simbolo.subtipo !== null && simbolo.subtipo !== undefined)
                         ? `[]${tipos[simbolo.subtipo] ?? simbolo.subtipo}`
                         : (tipos[simbolo.tipo] ?? simbolo.tipo)}
                     </td>
                     <td>
-                      {Array.isArray(simbolo.valor)
-                        ? `[${simbolo.valor.join(" ")}]`
-                        : simbolo.valor && typeof simbolo.valor === "object"
-                          ? JSON.stringify(simbolo.valor)
-                          : String(simbolo.valor)}
+                      {formatearValor(simbolo.valor)}
                     </td>
                     <td>{simbolo.entorno}</td>
                   </tr>
@@ -217,16 +279,22 @@ function App() {
 
         <div className="panel">
           <h2>Reporte AST (Graphviz)</h2>
-          {astGraphvizUrl ? (
+          {astDot ? (
             <div style={{ display: "grid", gap: "10px" }}>
-              <img
-                src={astGraphvizUrl}
-                alt="AST Graphviz"
-                style={{ width: "100%", maxHeight: "420px", objectFit: "contain", background: "#fff", border: "1px solid #ddd" }}
-              />
-              <a href={astGraphvizUrl} target="_blank" rel="noreferrer">
-                Abrir AST en pestaña nueva
-              </a>
+              {astCargando && <pre className="ast">Renderizando AST...</pre>}
+              {astRenderError && <pre className="ast">{astRenderError}</pre>}
+              {astImageUrl && (
+                <>
+                  <img
+                    src={astImageUrl}
+                    alt="AST Graphviz"
+                    style={{ width: "100%", maxHeight: "420px", objectFit: "contain", background: "#fff", border: "1px solid #ddd" }}
+                  />
+                  <a href={astImageUrl} target="_blank" rel="noreferrer">
+                    Abrir AST en pestaña nueva
+                  </a>
+                </>
+              )}
               <details>
                 <summary>Ver DOT generado</summary>
                 <pre className="ast">{astDot}</pre>

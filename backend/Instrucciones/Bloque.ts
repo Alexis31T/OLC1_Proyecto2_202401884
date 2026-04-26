@@ -35,8 +35,9 @@ export class Bloque extends Instruccion {
 
     public ast(arbol: any, tabla: TablaSimbolos): Node {
         let node = new Node("BLOQUE");
+        const entornoAst = this.entornoLocal ?? tabla;
         for (const instruccion of this.instrucciones) {
-            node.pushChild(instruccion.ast(arbol, this.entornoLocal));
+            node.pushChild(instruccion.ast(arbol, entornoAst));
         }
         return node;
     }
